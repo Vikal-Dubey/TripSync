@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  tripMemberships TripMember[]
+  expensesPaid    Expense[]      @relation("PaidBy")
+  splits          ExpenseSplit[]
+  messages        ChatMessage[]
+}
+
+model Trip {
+  id             String   @id @default(uuid())
+  name           String
+  destination    String
+  startDate      DateTime
+  endDate        DateTime
+  budget         Decimal?
+  inviteToken    String   @unique @default(uuid())
+  tokenExpiresAt DateTime
+  createdAt      DateTime @default(now())
+
+  members      TripMember[]
+  days         ItineraryDay[]
+  expenses     Expense[]
+  votes        Vote[]
+  messages     ChatMessage[]
+  packingItems PackingItem[]
+  bookings     Booking[]
+}
+
+model TripMember {
+  id       String   @id @default(uuid())
+  tripId   String
+  userId   String
+  role     Role     @default(PARTICIPANT)
+  joinedAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([tripId, userId])
+}
+
+enum Role {
+  ORGANIZER
+  PARTICIPANT
+}
+
+model ItineraryDay {
+  id        String    @id @default(uuid())
+  tripId    String
+  dayNumber Int
+  date      DateTime?
+
+  trip       Trip       @relation(fields: [tripId], references: [id])
+  activities Activity[]
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  dayId     String
+  title     String
+  time      String?
+  location  String?
+  notes     String?
+  addedById String
+  createdAt DateTime @default(now())
+
+  day ItineraryDay @relation(fields: [dayId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  tripId      String
+  paidById    String
+  amount      Decimal
+  category    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  trip   Trip           @relation(fields: [tripId], references: [id])
+  paidBy User           @relation("PaidBy", fields: [paidById], references: [id])
+  splits ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id        String  @id @default(uuid())
+  expenseId String
+  userId    String
+  amount    Decimal
+
+  expense Expense @relation(fields: [expenseId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  tripId    String
+  question  String
+  options   Json
+  votes     Json
+  createdAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  tripId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PackingItem {
+  id        String  @id @default(uuid())
+  tripId    String
+  name      String
+  checkedBy String?
+
+  trip Trip @relation(fields: [tripId], references: [id])
+}
+
+model Booking {
+  id        String   @id @default(uuid())
+  tripId    String
+  type      String
+  details   Json
+  createdAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id])
+}
