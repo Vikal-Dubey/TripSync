@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
+import authRoutes from "./routes/auth.js";
+import tripRoutes from "./routes/trips.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,23 +16,14 @@ const io = new Server(httpServer, {
 app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" }));
 app.use(express.json());
 
-// Phase 0 checkpoint route
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
-// Routes get mounted here as phases progress, e.g.:
-// import authRoutes from "./routes/auth.js";
-// app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/trips", tripRoutes);
 
 io.on("connection", (socket) => {
   console.log("socket connected:", socket.id);
-
-  // Phase 3 will add: socket.join(tripId), itinerary/vote/chat events
-
-  socket.on("disconnect", () => {
-    console.log("socket disconnected:", socket.id);
-  });
+  socket.on("disconnect", () => console.log("socket disconnected:", socket.id));
 });
 
 const PORT = process.env.PORT ?? 4000;
