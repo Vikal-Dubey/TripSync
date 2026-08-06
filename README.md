@@ -161,11 +161,11 @@ erDiagram
   - [x] Prisma configuration, schema definition, and initial migration run.
   - [x] Express backend skeleton with a functioning `/health` check route.
   - [x] React + Vite frontend skeleton connected to the backend health-check endpoint.
-- [ ] **Phase 1: Auth & Trip Core** (Pending)
-  - [ ] JWT authentication (signup, login, route protection).
-  - [ ] Trip CRUD (create trip, view, update settings).
-  - [ ] Invite-link join flow (token-based invites with expiry).
-  - [ ] Role-based access control (Organizer vs. Participant).
+- [x] **Phase 1: Auth & Trip Core** (Completed)
+  - [x] JWT authentication (signup, login, and route protection via `requireAuth` middleware).
+  - [x] Trip CRUD (create trip, get user's trips, get trip details, update trip settings, and delete trip).
+  - [x] Invite-link join flow (token-based invites with expiry validation).
+  - [x] Role-based access control (`requireMember` and `requireOrganizer` middlewares).
 - [ ] **Phase 2: Itinerary, Packing List, & Bookings** (Pending)
   - [ ] ItineraryDay & Activity CRUD.
   - [ ] Shared packing checklist (interactive checks/unchecks).
@@ -196,32 +196,71 @@ erDiagram
 
 ---
 
-## ⚙️ Phase 0 Verification & Checkpoint
+## ⚙️ Checkpoints & Verification
 
-The project currently has **Phase 0** fully implemented. This is verified by starting both components and checking their communication:
+### Phase 0 Checkpoint
 1. The **Backend** initializes the database client, starts a server on Port `4000` (or custom `PORT`), binds Socket.io, and exposes a `/health` endpoint.
 2. The **Frontend** boots on Port `5173` (Vite) and polls the backend `/health` endpoint.
 3. The page renders: **"Server status: ok"** to verify CORS and server-client communication are functioning correctly.
+
+### Phase 1 Checkpoint (Auth & Trip Core)
+With Phase 1 complete, users can sign up, log in, create trips, invite members, and access secure pages.
+
+#### 1. Backend REST Endpoints
+* **Auth Routes (`/api/auth`)**:
+  * `POST /signup`: Registers a new user, hashes password via `bcrypt`, generates a JWT, and returns the token and user details.
+  * `POST /login`: Validates user credentials and returns a JWT token.
+* **Trip Routes (`/api/trips`)**:
+  * `POST /`: Creates a new trip. The creator is automatically added as the `ORGANIZER` member.
+  * `GET /`: Lists all trips that the authenticated user is a member of.
+  * `GET /:tripId`: Retrieves details for a specific trip (accessible to members only).
+  * `PATCH /:tripId`: Updates trip details (accessible to organizers only).
+  * `DELETE /:tripId`: Deletes a trip (accessible to organizers only).
+  * `POST /join/:inviteToken`: Joins a trip via its unique invite token (checks token expiry before adding user as `PARTICIPANT`).
+
+#### 2. Express Middlewares
+* [`auth.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/middleware/auth.js) (`requireAuth`): Extracts the JWT token from the `Authorization` header (`Bearer <token>`) and verifies it.
+* [`requireMember.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/middleware/requireMember.js): Verifies that the authenticated user belongs to the requested trip.
+* [`requireOrganizer.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/middleware/requireOrganizer.js): Verifies that the authenticated user is the organizer of the requested trip.
+
+#### 3. Frontend Pages & Store
+* State management is powered by Zustand ([`authStore.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/store/authStore.js)) to manage user sessions and tokens in `localStorage`.
+* **Pages**:
+  * `/signup` ([`SignupPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/SignupPage.jsx)): Multi-field registration form.
+  * `/login` ([`LoginPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/LoginPage.jsx)): Secure credentials validation form.
+  * `/` ([`DashboardPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/DashboardPage.jsx)): Lists trips user belongs to, allows creating a new trip, and links to details. Protected route.
+  * `/trips/:tripId` ([`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx)): Main trip workspace containing trip info, member list, and settings panel. Protected route.
+  * `/join/:inviteToken` ([`JoinTripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/JoinTripPage.jsx)): Handles instant join-trip actions using invite tokens.
 
 ---
 
 ## 🛠️ Local Installation & Setup
 
-Follow these steps to run the Phase 0 skeleton locally:
+Follow these steps to run the application locally:
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18+)
-- [Docker](https://www.docker.com/) (for Postgres and Redis)
+- [Docker](https://www.docker.com/) (for PostgreSQL and Redis)
 
-### Step 1: Clone & Configure Services
+### Step 1: Start Services & Configure Environments
 1. Start PostgreSQL and Redis containers:
    ```bash
    cd backend
    docker compose up -d
    ```
 2. Copy environment files in both folders and adjust parameters if needed:
-   - For backend: `cp .env.example .env` (contains the PostgreSQL link `postgresql://tripsync:tripsync@localhost:5432/tripsync` matching docker settings).
-   - For frontend: `cp .env.example .env` (contains `VITE_API_URL=http://localhost:4000`).
+   * **Backend**: Copy `backend/.env.example` to `backend/.env`
+     ```env
+     DATABASE_URL="postgresql://tripsync:tripsync@localhost:5432/tripsync?schema=public"
+     JWT_SECRET="replace-with-a-long-random-string"
+     PORT=4000
+     CLIENT_ORIGIN="http://localhost:5173"
+     REDIS_URL="redis://localhost:6379"
+     ```
+   * **Frontend**: Copy `frontend/.env.example` to `frontend/.env`
+     ```env
+     VITE_API_URL="http://localhost:4000"
+     ```
 
 ### Step 2: Set up the Backend
 1. Install dependencies:
@@ -237,7 +276,7 @@ Follow these steps to run the Phase 0 skeleton locally:
    ```bash
    npm run dev
    ```
-   The backend will be running at `http://localhost:4000`, and you should see `TripSync server listening on http://localhost:4000`.
+   The backend will be running at `http://localhost:4000`.
 
 ### Step 3: Set up the Frontend
 1. Open a new terminal and navigate to the frontend directory:
@@ -249,4 +288,4 @@ Follow these steps to run the Phase 0 skeleton locally:
    ```bash
    npm run dev
    ```
-   Open `http://localhost:5173` in your browser. You should see the **TripSync** title and **Server status: ok**.
+   Open `http://localhost:5173` in your browser. You can register an account, log in, create a trip, copy the invite link, and test member-joining logic!
