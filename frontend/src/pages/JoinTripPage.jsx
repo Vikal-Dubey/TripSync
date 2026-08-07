@@ -11,7 +11,6 @@ export default function JoinTripPage() {
 
   useEffect(() => {
     if (!token) {
-      // not logged in — send to login, then come back here after
       navigate(`/login?redirect=/join/${inviteToken}`);
       return;
     }
@@ -20,6 +19,13 @@ export default function JoinTripPage() {
       .catch((e) => setError(e.message));
   }, [token, inviteToken, navigate]);
 
-  if (error) return <p style={{ color: "red" }}>{error}</p>;
-  return <p>Joining trip...</p>;
+  return (
+    <div className="max-w-sm mx-auto mt-16 px-4 text-center">
+      {error ? (
+        <p className="text-red-600">{error}</p>
+      ) : (
+        <p className="text-ink/60 font-mono text-sm">Joining trip…</p>
+      )}
+    </div>
+  );
 }

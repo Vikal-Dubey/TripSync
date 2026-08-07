@@ -31,32 +31,53 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h2>Your trips</h2>
-        <button onClick={() => setShowForm((v) => !v)}>{showForm ? "Cancel" : "New trip"}</button>
+    <div className="max-w-2xl mx-auto mt-10 px-4">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="heading text-3xl">Your trips</h2>
+        <button className="btn-primary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? "Cancel" : "New trip"}
+        </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", margin: "1rem 0" }}>
-          <input placeholder="Trip name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} required />
-          <label>Start date <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required /></label>
-          <label>End date <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required /></label>
-          <input placeholder="Budget (optional)" type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
-          {error && <p style={{ color: "red" }}>{error}</p>}
-          <button type="submit">Create</button>
+        <form onSubmit={handleCreate} className="card flex flex-col gap-3 mb-6">
+          <input className="input" placeholder="Trip name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input className="input" placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} required />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm text-ink/60">
+              Start date
+              <input className="input mt-1 w-full" type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
+            </label>
+            <label className="text-sm text-ink/60">
+              End date
+              <input className="input mt-1 w-full" type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
+            </label>
+          </div>
+          <input className="input" placeholder="Budget (optional)" type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <button type="submit" className="btn-primary">Create</button>
         </form>
       )}
 
       {trips.length === 0 ? (
-        <p>No trips yet — create one to get started.</p>
+        <div className="card text-center text-ink/50 py-10">
+          No trips yet — create one to get started.
+        </div>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
+        <ul className="flex flex-col gap-3">
           {trips.map((trip) => (
-            <li key={trip.id} style={{ padding: "0.75rem", border: "1px solid #ddd", borderRadius: 8, marginBottom: "0.5rem" }}>
-              <Link to={`/trips/${trip.id}`}>
-                <strong>{trip.name}</strong> — {trip.destination}
+            <li key={trip.id}>
+              <Link
+                to={`/trips/${trip.id}`}
+                className="card flex items-center justify-between hover:border-trail transition-colors"
+              >
+                <div>
+                  <p className="font-semibold text-ink">{trip.name}</p>
+                  <p className="text-sm text-ink/60">{trip.destination}</p>
+                </div>
+                <span className="font-mono text-xs text-ink/40">
+                  {new Date(trip.startDate).toLocaleDateString()}
+                </span>
               </Link>
             </li>
           ))}

@@ -6,12 +6,16 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   return (
-    <nav style={{ display: "flex", gap: "1rem", padding: "1rem", borderBottom: "1px solid #ddd" }}>
-      <Link to="/">TripSync</Link>
+    <nav className="sticky top-0 z-10 flex items-center gap-4 px-6 py-4 bg-white border-b-2 border-trail shadow-sm">
+      <Link to="/" className="heading text-xl text-trail flex items-center gap-1.5">
+        <span className="w-2.5 h-2.5 rounded-full bg-amber inline-block" />
+        TripSync
+      </Link>
       {token ? (
         <>
-          <span style={{ marginLeft: "auto" }}>Hi, {user?.name}</span>
+          <span className="ml-auto text-sm text-ink/60">Hi, {user?.name}</span>
           <button
+            className="btn-secondary text-sm"
             onClick={() => {
               logout();
               navigate("/login");
@@ -22,8 +26,8 @@ export default function Navbar() {
         </>
       ) : (
         <>
-          <Link to="/login" style={{ marginLeft: "auto" }}>Log in</Link>
-          <Link to="/signup">Sign up</Link>
+          <Link to="/login" className="ml-auto btn-secondary text-sm">Log in</Link>
+          <Link to="/signup" className="btn-primary text-sm">Sign up</Link>
         </>
       )}
     </nav>
