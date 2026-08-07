@@ -6,6 +6,8 @@ import { requireOrganizer } from "../middleware/requireOrganizer.js";
 import itineraryRoutes from "./itinerary.js";
 import packingRoutes from "./packing.js";
 import bookingRoutes from "./bookings.js";
+import voteRoutes from "./votes.js";
+import chatRoutes from "./chat.js";
 
 const router = Router();
 router.use(requireAuth); // every route below requires a valid token
@@ -98,5 +100,7 @@ router.post("/join/:inviteToken", async (req, res) => {
 router.use("/:tripId/days", requireMember, itineraryRoutes);
 router.use("/:tripId/packing", requireMember, packingRoutes);
 router.use("/:tripId/bookings", requireMember, bookingRoutes);
+router.use("/:tripId/votes", requireMember, voteRoutes);
+router.use("/:tripId/messages", requireMember, chatRoutes);
 
 export default router;

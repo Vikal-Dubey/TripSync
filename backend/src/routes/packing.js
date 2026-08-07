@@ -16,6 +16,7 @@ router.post("/", async (req, res) => {
   if (!name) return res.status(400).json({ error: "name is required" });
 
   const item = await prisma.packingItem.create({ data: { tripId: req.params.tripId, name } });
+  req.app.get("io").to(req.params.tripId).emit("packing:added", item);
   res.status(201).json(item);
 });
 
@@ -27,6 +28,7 @@ router.patch("/:itemId", async (req, res) => {
   if (result.count === 0) return res.status(404).json({ error: "Item not found in this trip" });
 
   const item = await prisma.packingItem.findUnique({ where: { id: req.params.itemId } });
+  req.app.get("io").to(req.params.tripId).emit("packing:updated", item);
   res.json(item);
 });
 
@@ -35,6 +37,8 @@ router.delete("/:itemId", async (req, res) => {
     where: { id: req.params.itemId, tripId: req.params.tripId },
   });
   if (result.count === 0) return res.status(404).json({ error: "Item not found in this trip" });
+
+  req.app.get("io").to(req.params.tripId).emit("packing:deleted", { itemId: req.params.itemId });
   res.status(204).send();
 });
 
