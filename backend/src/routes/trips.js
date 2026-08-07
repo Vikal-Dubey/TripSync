@@ -3,6 +3,9 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireMember } from "../middleware/requireMember.js";
 import { requireOrganizer } from "../middleware/requireOrganizer.js";
+import itineraryRoutes from "./itinerary.js";
+import packingRoutes from "./packing.js";
+import bookingRoutes from "./bookings.js";
 
 const router = Router();
 router.use(requireAuth); // every route below requires a valid token
@@ -91,5 +94,9 @@ router.post("/join/:inviteToken", async (req, res) => {
   });
   res.status(201).json({ message: "Joined trip", trip });
 });
+
+router.use("/:tripId/days", requireMember, itineraryRoutes);
+router.use("/:tripId/packing", requireMember, packingRoutes);
+router.use("/:tripId/bookings", requireMember, bookingRoutes);
 
 export default router;
