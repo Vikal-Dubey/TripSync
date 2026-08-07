@@ -15,6 +15,45 @@ TripSync is designed to solve the friction of organizing group trips. The app pr
 
 ---
 
+## 📂 Folder Structure
+
+The project is structured as a monorepo containing the Express API `backend` and Vite-React `frontend` directories:
+
+```text
+TripSync/
+├── backend/                  # Node.js + Express API Backend
+│   ├── prisma/               # Prisma Database Schemas & Migrations
+│   │   ├── migrations/       # Database SQL migration scripts
+│   │   └── schema.prisma     # Relational database models definition
+│   ├── src/                  # Backend Application Source Code
+│   │   ├── generated/        # Auto-generated Prisma Client
+│   │   ├── lib/              # Client loaders & helpers (jwt.js, prisma.js)
+│   │   ├── middleware/       # Express middlewares (auth, member, organizer checks)
+│   │   ├── routes/           # REST endpoints (auth, bookings, itinerary, packing, trips)
+│   │   └── index.js          # App entry point & HTTP / Socket server config
+│   ├── .env.example          # Template environment configurations
+│   ├── docker-compose.yml    # Docker configuration for Postgres & Redis
+│   └── package.json          # Server package and dev dependencies
+└── frontend/                 # Vite + React Single Page App Frontend
+    ├── src/                  # Frontend Application Source Code
+    │   ├── api/              # Axios/Fetch HTTP client API handlers
+    │   │   ├── auth.js       # Authentication requests
+    │   │   ├── bookings.js   # Bookings CRUD API client
+    │   │   ├── client.js     # Shared client settings (headers, base URLs)
+    │   │   ├── itinerary.js  # Days & Activities API client
+    │   │   ├── packing.js    # Packing checklist API client
+    │   │   └── trips.js      # Trips settings & info API client
+    │   ├── components/       # Shared interface components (Navbar, ProtectedRoute)
+    │   ├── pages/            # View components (Dashboard, Login, Signup, Trip, JoinTrip)
+    │   ├── store/            # Lightweight global state stores (Zustand)
+    │   ├── App.jsx           # App shell and routing structure
+    │   └── main.jsx          # DOM rendering and entry configuration
+    ├── .env.example          # Template client-side environment configurations
+    └── package.json          # Client dependencies & scripts configuration
+```
+
+---
+
 ## 🛠️ Tech Stack & Architecture Decisions
 
 | Layer | Technology | Rationale & Trade-offs |
@@ -166,10 +205,10 @@ erDiagram
   - [x] Trip CRUD (create trip, get user's trips, get trip details, update trip settings, and delete trip).
   - [x] Invite-link join flow (token-based invites with expiry validation).
   - [x] Role-based access control (`requireMember` and `requireOrganizer` middlewares).
-- [ ] **Phase 2: Itinerary, Packing List, & Bookings** (Pending)
-  - [ ] ItineraryDay & Activity CRUD.
-  - [ ] Shared packing checklist (interactive checks/unchecks).
-  - [ ] Booking storage (flights, hotels, transport details).
+- [x] **Phase 2: Itinerary, Packing List, & Bookings** (Completed)
+  - [x] ItineraryDay & Activity CRUD (add days, add/remove day activities).
+  - [x] Shared packing checklist (interactive list check/uncheck status tracking).
+  - [x] Booking storage (store confirmation number, details, URL link for flights/hotels/trains).
 - [ ] **Phase 3: Realtime Layer** (Pending)
   - [ ] Socket.io integration with room isolation (`socket.join(tripId)`).
   - [ ] Live itinerary synchronization.
@@ -231,6 +270,39 @@ With Phase 1 complete, users can sign up, log in, create trips, invite members, 
   * `/` ([`DashboardPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/DashboardPage.jsx)): Lists trips user belongs to, allows creating a new trip, and links to details. Protected route.
   * `/trips/:tripId` ([`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx)): Main trip workspace containing trip info, member list, and settings panel. Protected route.
   * `/join/:inviteToken` ([`JoinTripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/JoinTripPage.jsx)): Handles instant join-trip actions using invite tokens.
+
+### Phase 2 Checkpoint (Itinerary, Packing List, & Bookings)
+In Phase 2, core trip workspace features have been implemented, including the backend REST endpoints and the corresponding UI components in the main workspace view.
+
+#### 1. Backend REST Endpoints
+All new sub-routes are nested under the trip router (`/api/trips/:tripId`) and secured by both the authentication and member middleware (`requireAuth` and `requireMember`):
+* **Itinerary Routes (`/api/trips/:tripId/days`)** (mapped in [`itinerary.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/routes/itinerary.js)):
+  * `GET /`: Lists all itinerary days and activities for the specified trip, ordered by day number.
+  * `POST /`: Creates a new itinerary day.
+  * `DELETE /:dayId`: Deletes an itinerary day and all activities assigned to it.
+  * `POST /:dayId/activities`: Adds a new activity (title, time, location, notes) to a day.
+  * `PATCH /:dayId/activities/:activityId`: Modifies details of a specific activity.
+  * `DELETE /:dayId/activities/:activityId`: Removes an activity from a day.
+* **Packing Routes (`/api/trips/:tripId/packing`)** (mapped in [`packing.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/routes/packing.js)):
+  * `GET /`: Lists all shared packing items for the trip.
+  * `POST /`: Adds a new item to the packing list.
+  * `PATCH /:itemId`: Toggles the checked status (stores the checking user's ID or sets it to null).
+  * `DELETE /:itemId`: Deletes a packing item.
+* **Booking Routes (`/api/trips/:tripId/bookings`)** (mapped in [`bookings.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/routes/bookings.js)):
+  * `GET /`: Lists all trip bookings.
+  * `POST /`: Adds a new booking with a type (flight, hotel, transport) and JSON details (confirmation #, URL link).
+  * `PATCH /:bookingId`: Updates booking details.
+  * `DELETE /:bookingId`: Deletes a booking record.
+
+#### 2. Frontend Workspace UI & API Clients
+* **API Handlers**:
+  * [`itinerary.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/api/itinerary.js): Client calls for days and activities.
+  * [`packing.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/api/packing.js): Client calls for checking items and listing the checklist.
+  * [`bookings.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/api/bookings.js): Client calls for managing reservation cards.
+* **UI Features in [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx)**:
+  * **Day-by-Day Itinerary Layout**: Displays itinerary days with a vertical timeline representing individual activities. Users can create days, add activities instantly by pressing Enter, and remove individual activities.
+  * **Packing Checklist**: A shared list of packing items that can be dynamically checked or unchecked. Checked items are visually marked with a line-through.
+  * **Booking Workspace**: A clean view showcasing booked accommodations, flights, or tickets. Includes type, confirmation details, and outward links.
 
 ---
 
