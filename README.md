@@ -29,8 +29,8 @@ TripSync/
 │   │   ├── generated/        # Auto-generated Prisma Client
 │   │   ├── lib/              # Client loaders & helpers (jwt.js, prisma.js)
 │   │   ├── middleware/       # Express middlewares (auth, member, organizer checks)
-│   │   ├── routes/           # REST endpoints (auth, bookings, itinerary, packing, trips)
-│   │   └── index.js          # App entry point & HTTP / Socket server config
+│   │   ├── routes/           # REST endpoints (auth, bookings, chat, itinerary, packing, trips, votes)
+│   │   └── index.js          # App entry point, socket handlers & Redis pub/sub config
 │   ├── .env.example          # Template environment configurations
 │   ├── docker-compose.yml    # Docker configuration for Postgres & Redis
 │   └── package.json          # Server package and dev dependencies
@@ -39,11 +39,15 @@ TripSync/
     │   ├── api/              # Axios/Fetch HTTP client API handlers
     │   │   ├── auth.js       # Authentication requests
     │   │   ├── bookings.js   # Bookings CRUD API client
+    │   │   ├── chat.js       # Chat messages API client
     │   │   ├── client.js     # Shared client settings (headers, base URLs)
     │   │   ├── itinerary.js  # Days & Activities API client
     │   │   ├── packing.js    # Packing checklist API client
-    │   │   └── trips.js      # Trips settings & info API client
+    │   │   ├── trips.js      # Trips settings & info API client
+    │   │   └── votes.js      # Voting/Polls API client
     │   ├── components/       # Shared interface components (Navbar, ProtectedRoute)
+    │   ├── lib/              # Frontend utilities and connections
+    │   │   └── socket.js     # Socket.io client instance initialization
     │   ├── pages/            # View components (Dashboard, Login, Signup, Trip, JoinTrip)
     │   ├── store/            # Lightweight global state stores (Zustand)
     │   ├── App.jsx           # App shell and routing structure
@@ -209,11 +213,12 @@ erDiagram
   - [x] ItineraryDay & Activity CRUD (add days, add/remove day activities).
   - [x] Shared packing checklist (interactive list check/uncheck status tracking).
   - [x] Booking storage (store confirmation number, details, URL link for flights/hotels/trains).
-- [ ] **Phase 3: Realtime Layer** (Pending)
-  - [ ] Socket.io integration with room isolation (`socket.join(tripId)`).
-  - [ ] Live itinerary synchronization.
-  - [ ] Live voting system and group chat.
-  - [ ] Redis adapter integration for horizontal scaling.
+- [x] **Phase 3: Realtime Layer** (Completed)
+  - [x] Socket.io integration with JWT handshake authentication & room isolation (`socket.join(tripId)`).
+  - [x] Live itinerary synchronization (instant updates on days and activities changes).
+  - [x] Live voting system (create polls via REST, cast votes via socket room events, update counts live).
+  - [x] Live group chat (messages relayed in real time and persisted in Postgres).
+  - [x] Socket connectivity state indicator in UI.
 - [ ] **Phase 4: Expense Ledger & Debt Settle-up** (Pending)
   - [ ] Expense creation and user splits.
   - [ ] Net balance calculations.
@@ -303,6 +308,23 @@ All new sub-routes are nested under the trip router (`/api/trips/:tripId`) and s
   * **Day-by-Day Itinerary Layout**: Displays itinerary days with a vertical timeline representing individual activities. Users can create days, add activities instantly by pressing Enter, and remove individual activities.
   * **Packing Checklist**: A shared list of packing items that can be dynamically checked or unchecked. Checked items are visually marked with a line-through.
   * **Booking Workspace**: A clean view showcasing booked accommodations, flights, or tickets. Includes type, confirmation details, and outward links.
+
+### Phase 3 Checkpoint (Realtime Layer)
+Phase 3 adds bi-directional WebSocket syncing to ensure the UI stays synchronized across multiple devices without manual refreshing.
+
+#### 1. Socket Authentication & Room Security
+* The Socket.io connection uses a handshake authorization check where it verifies the JWT token using `verifyToken` on connection.
+* Sockets must explicitly join a trip room via the `trip:join` socket event. The backend validates database membership before joining (`socket.join(tripId)`), ensuring isolation between different trips.
+
+#### 2. Real-Time Sync Strategy
+* **Hybrid REST/Socket Operations**:
+  * Creation, updates, and deletions for itinerary days, activities, bookings, and packing checklist items occur over REST APIs.
+  * Upon successful database writes, the backend triggers broadcasts via `req.app.get("io").to(tripId).emit(...)` to immediately push patches to other users.
+* **Pure Socket Events**:
+  * **Group Chat**: Sending message events (`chat:send`) happens directly via websockets. The server records the message in the database and broadcasts the new message payload via the `chat:new` event.
+  * **Live Voting**: Casting votes (`vote:cast`) updates the database JSON column for the poll's vote log, and instantly publishes the updated vote structure via `vote:updated` to render progress bars live.
+* **State indicator**:
+  * A socket connection dot is displayed in [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx) header which changes color based on `connected` status.
 
 ---
 
