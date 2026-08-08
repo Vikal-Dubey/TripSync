@@ -27,9 +27,9 @@ TripSync/
 │   │   └── schema.prisma     # Relational database models definition
 │   ├── src/                  # Backend Application Source Code
 │   │   ├── generated/        # Auto-generated Prisma Client
-│   │   ├── lib/              # Client loaders & helpers (jwt.js, prisma.js)
+│   │   ├── lib/              # Helpers & algorithms (jwt.js, prisma.js, settleUp.js)
 │   │   ├── middleware/       # Express middlewares (auth, member, organizer checks)
-│   │   ├── routes/           # REST endpoints (auth, bookings, chat, itinerary, packing, trips, votes)
+│   │   ├── routes/           # REST endpoints (auth, bookings, chat, expenses, itinerary, packing, trips, votes)
 │   │   └── index.js          # App entry point, socket handlers & Redis pub/sub config
 │   ├── .env.example          # Template environment configurations
 │   ├── docker-compose.yml    # Docker configuration for Postgres & Redis
@@ -41,6 +41,7 @@ TripSync/
     │   │   ├── bookings.js   # Bookings CRUD API client
     │   │   ├── chat.js       # Chat messages API client
     │   │   ├── client.js     # Shared client settings (headers, base URLs)
+    │   │   ├── expenses.js   # Expense ledger and balances API client
     │   │   ├── itinerary.js  # Days & Activities API client
     │   │   ├── packing.js    # Packing checklist API client
     │   │   ├── trips.js      # Trips settings & info API client
@@ -219,11 +220,11 @@ erDiagram
   - [x] Live voting system (create polls via REST, cast votes via socket room events, update counts live).
   - [x] Live group chat (messages relayed in real time and persisted in Postgres).
   - [x] Socket connectivity state indicator in UI.
-- [ ] **Phase 4: Expense Ledger & Debt Settle-up** (Pending)
-  - [ ] Expense creation and user splits.
-  - [ ] Net balance calculations.
-  - [ ] Debt minimization settlement algorithm.
-  - [ ] Real-time updates over Socket.io.
+- [x] **Phase 4: Expense Ledger & Debt Settle-up** (Completed)
+  - [x] Expense creation and user splits (supports equal split calculation or customized amount split).
+  - [x] Net balance calculations for each user based on their shares and payments.
+  - [x] Debt minimization settlement algorithm using a greedy largest-creditor-vs-largest-debtor matching logic.
+  - [x] Real-time updates over Socket.io (`expense:added`, `expense:deleted`, `balances:updated`).
 - [ ] **Phase 5: LLM Integration** (Pending)
   - [ ] AI itinerary draft generator.
   - [ ] Chat message summarization tool.
@@ -325,6 +326,28 @@ Phase 3 adds bi-directional WebSocket syncing to ensure the UI stays synchronize
   * **Live Voting**: Casting votes (`vote:cast`) updates the database JSON column for the poll's vote log, and instantly publishes the updated vote structure via `vote:updated` to render progress bars live.
 * **State indicator**:
   * A socket connection dot is displayed in [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx) header which changes color based on `connected` status.
+
+### Phase 4 Checkpoint (Expense Ledger & Debt Settle-up)
+Phase 4 adds expense splitting capabilities and a transaction-minimization settle-up engine, allowing group trip members to keep track of spending and resolve debts simply.
+
+#### 1. Backend REST Endpoints
+* **Expense Routes (`/api/trips/:tripId/expenses`)** (mapped in [`expenses.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/routes/expenses.js)):
+  * `GET /`: Lists all expenses registered for the trip, including paidBy information and user split ratios.
+  * `GET /balances`: Computes the net balance for each user (total paid minus total owed) and runs the transaction-minimization engine to return a list of recommended settlements.
+  * `POST /`: Registers a new expense. Computes splits evenly by default, or accepts custom amounts (verifying that they add up to the total). Emits `expense:added` and `balances:updated` via Socket.io.
+  * `DELETE /:expenseId`: Deletes an expense and its associated splits. Emits `expense:deleted` and `balances:updated` via Socket.io.
+
+#### 2. Debt Settlement Engine
+* Handled in [`settleUp.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/lib/settleUp.js) using a greedy largest-creditor-vs-largest-debtor matching logic.
+* While the general minimum-transaction problem is NP-hard (subset-sum variant), this heuristic runs in $O(N \log N)$ time (due to sorting) and produces minimal settlements that cover all outstanding balances efficiently.
+
+#### 3. Frontend Workspace UI & API Clients
+* **API Handler**:
+  * [`expenses.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/api/expenses.js): Handles REST calls for adding, listing, deleting expenses, and fetching settlements.
+* **UI Features in [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx)**:
+  * **Expenses Workspace**: Display panel lists recent expenses with details on who paid, description, amount, and category.
+  * **Interactive Settle-up Panel**: Displays net user balances (positive/green for creditors, negative/red for debtors) alongside a list of direct, optimized payments (e.g. *"Bob owes Alice $50.00"*).
+  * **Socket Updates**: Balances and settlement views update instantly in response to real-time events (`expense:added`, `expense:deleted`, `balances:updated`).
 
 ---
 
