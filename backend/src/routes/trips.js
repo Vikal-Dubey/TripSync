@@ -8,6 +8,7 @@ import packingRoutes from "./packing.js";
 import bookingRoutes from "./bookings.js";
 import voteRoutes from "./votes.js";
 import chatRoutes from "./chat.js";
+import expenseRoutes from "./expenses.js";
 
 const router = Router();
 router.use(requireAuth); // every route below requires a valid token
@@ -102,5 +103,6 @@ router.use("/:tripId/packing", requireMember, packingRoutes);
 router.use("/:tripId/bookings", requireMember, bookingRoutes);
 router.use("/:tripId/votes", requireMember, voteRoutes);
 router.use("/:tripId/messages", requireMember, chatRoutes);
+router.use("/:tripId/expenses", requireMember, expenseRoutes);
 
 export default router;
