@@ -8,6 +8,7 @@ import { listMessages } from "../api/chat.js";
 import { useAuthStore } from "../store/authStore.js";
 import { getSocket } from "../lib/socket.js";
 import { listBookings, addBooking, updateBooking, deleteBooking } from "../api/bookings.js";
+import { listExpenses, getBalances, addExpense, deleteExpense } from "../api/expenses.js";
 
 export default function TripPage() {
   const { tripId } = useParams();
@@ -22,6 +23,8 @@ export default function TripPage() {
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [balanceSummary, setBalanceSummary] = useState({ balances: [], settlements: [] });
 
   const socketRef = useRef(null);
 
@@ -34,14 +37,18 @@ export default function TripPage() {
       listBookings(token, tripId),
       listVotes(token, tripId),
       listMessages(token, tripId),
+      listExpenses(token, tripId),
+      getBalances(token, tripId),
     ])
-      .then(([tripData, daysData, itemsData, bookingsData, votesData, messagesData]) => {
+      .then(([tripData, daysData, itemsData, bookingsData, votesData, messagesData, expensesData, balancesData]) => {
         setTrip(tripData);
         setDays(daysData);
         setPackingItems(itemsData);
         setBookings(bookingsData);
         setVotes(votesData);
         setMessages(messagesData);
+        setExpenses(expensesData);
+        setBalanceSummary(balancesData);
       })
       .catch((e) => setError(e.message));
   }, [token, tripId]);
@@ -98,6 +105,12 @@ export default function TripPage() {
 
     socket.on("chat:new", (message) => setMessages((prev) => [...prev, message]));
 
+    socket.on("expense:added", (expense) => setExpenses((prev) => [expense, ...prev]));
+    socket.on("expense:deleted", ({ expenseId }) =>
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseId))
+    );
+    socket.on("balances:updated", (summary) => setBalanceSummary(summary));
+
     return () => {
       socket.off("day:added");
       socket.off("day:deleted");
@@ -112,6 +125,9 @@ export default function TripPage() {
       socket.off("booking:updated");
       socket.off("booking:deleted");
       socket.off("chat:new");
+      socket.off("expense:added");
+      socket.off("expense:deleted");
+      socket.off("balances:updated");
       socket.disconnect();
     };
   }, [token, tripId]);
@@ -156,6 +172,14 @@ export default function TripPage() {
   function handleSendChat(content) {
     if (!content.trim()) return;
     socketRef.current?.emit("chat:send", { tripId, content });
+  }
+
+  async function handleAddExpense(amount, category, description, splitAmong) {
+    if (!amount || Number(amount) <= 0) return;
+    await addExpense(token, tripId, { amount: Number(amount), category, description, splitAmong });
+  }
+  async function handleDeleteExpense(expenseId) {
+    await deleteExpense(token, tripId, expenseId);
   }
 
   if (error) return <p className="text-red-600 text-center mt-10">{error}</p>;
@@ -236,6 +260,18 @@ export default function TripPage() {
       <Section title="Group chat">
         <ChatBox messages={messages} currentUserId={currentUserId} onSend={handleSendChat} />
       </Section>
+
+      <Section title="Expenses">
+        <ExpensesPanel
+          expenses={expenses}
+          balanceSummary={balanceSummary}
+          members={trip.members}
+          currentUserId={currentUserId}
+          onAdd={handleAddExpense}
+          onDelete={handleDeleteExpense}
+        />
+      </Section>
+
     </div>
   );
 }
@@ -532,6 +568,120 @@ function ChatBox({ messages, currentUserId, onSend }) {
         >
           Send
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ExpensesPanel({ expenses, balanceSummary, members, currentUserId, onAdd, onDelete }) {
+  const [form, setForm] = useState({ amount: "", category: "", description: "" });
+  const [splitWith, setSplitWith] = useState(members.map((m) => m.userId)); // default: everyone
+
+  function toggleMember(userId) {
+    setSplitWith((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Balances + settle-up */}
+      <div className="card">
+        <p className="heading text-sm text-ink/60 mb-2">Balances</p>
+        <ul className="flex flex-col gap-1 mb-3 text-sm">
+          {balanceSummary.balances.map((b) => (
+            <li key={b.userId} className="flex justify-between">
+              <span>{b.userId === currentUserId ? "You" : b.name}</span>
+              <span className={b.balance > 0 ? "text-trail" : b.balance < 0 ? "text-amber" : "text-ink/40"}>
+                {b.balance > 0 ? `+₹${b.balance}` : b.balance < 0 ? `-₹${Math.abs(b.balance)}` : "settled"}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {balanceSummary.settlements.length > 0 && (
+          <>
+            <p className="heading text-sm text-ink/60 mb-2">Settle up</p>
+            <ul className="flex flex-col gap-1 text-sm">
+              {balanceSummary.settlements.map((s, i) => (
+                <li key={i} className="code-chip bg-transparent! p-0! flex gap-1">
+                  <span>{s.fromName === undefined ? s.from : s.fromName}</span>
+                  <span className="text-amber">→</span>
+                  <span>{s.toName ?? s.to}</span>
+                  <span className="ml-auto font-semibold">₹{s.amount}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      {/* Expense list */}
+      <div className="card">
+        <ul className="flex flex-col gap-2 mb-3">
+          {expenses.map((e) => (
+            <li key={e.id} className="flex items-center justify-between text-sm border-b border-mist last:border-0 pb-2 last:pb-0">
+              <div>
+                <span className="font-medium">₹{Number(e.amount)}</span>{" "}
+                <span className="text-ink/50">
+                  {e.category && `${e.category} — `}
+                  paid by {e.paidBy.name}
+                </span>
+              </div>
+              <button className="text-ink/40 hover:text-red-500 text-xs" onClick={() => onDelete(e.id)}>
+                delete
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/* Add expense form */}
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              className="input text-sm"
+              placeholder="Amount"
+              type="number"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            />
+            <input
+              className="input text-sm"
+              placeholder="Category (optional)"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            />
+          </div>
+          <input
+            className="input text-sm"
+            placeholder="Description (optional)"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <div>
+            <p className="text-xs text-ink/50 mb-1">Split among:</p>
+            <div className="flex flex-wrap gap-2">
+              {members.map((m) => (
+                <label key={m.userId} className="code-chip py-1! flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-trail"
+                    checked={splitWith.includes(m.userId)}
+                    onChange={() => toggleMember(m.userId)}
+                  />
+                  {m.user.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          <button
+            className="btn-primary text-sm self-start"
+            onClick={() => {
+              onAdd(form.amount, form.category, form.description, splitWith);
+              setForm({ amount: "", category: "", description: "" });
+            }}
+          >
+            Add expense
+          </button>
+        </div>
       </div>
     </div>
   );
