@@ -27,9 +27,9 @@ TripSync/
 │   │   └── schema.prisma     # Relational database models definition
 │   ├── src/                  # Backend Application Source Code
 │   │   ├── generated/        # Auto-generated Prisma Client
-│   │   ├── lib/              # Helpers & algorithms (jwt.js, prisma.js, settleUp.js)
+│   │   ├── lib/              # Helpers, algorithms & LLM wrapper (jwt.js, llm.js, prisma.js, settleUp.js)
 │   │   ├── middleware/       # Express middlewares (auth, member, organizer checks)
-│   │   ├── routes/           # REST endpoints (auth, bookings, chat, expenses, itinerary, packing, trips, votes)
+│   │   ├── routes/           # REST endpoints (ai, auth, bookings, chat, expenses, itinerary, packing, trips, votes)
 │   │   └── index.js          # App entry point, socket handlers & Redis pub/sub config
 │   ├── .env.example          # Template environment configurations
 │   ├── docker-compose.yml    # Docker configuration for Postgres & Redis
@@ -37,6 +37,7 @@ TripSync/
 └── frontend/                 # Vite + React Single Page App Frontend
     ├── src/                  # Frontend Application Source Code
     │   ├── api/              # Axios/Fetch HTTP client API handlers
+    │   │   ├── ai.js         # AI recommendations & optimization API client
     │   │   ├── auth.js       # Authentication requests
     │   │   ├── bookings.js   # Bookings CRUD API client
     │   │   ├── chat.js       # Chat messages API client
@@ -225,10 +226,11 @@ erDiagram
   - [x] Net balance calculations for each user based on their shares and payments.
   - [x] Debt minimization settlement algorithm using a greedy largest-creditor-vs-largest-debtor matching logic.
   - [x] Real-time updates over Socket.io (`expense:added`, `expense:deleted`, `balances:updated`).
-- [ ] **Phase 5: LLM Integration** (Pending)
-  - [ ] AI itinerary draft generator.
-  - [ ] Chat message summarization tool.
-  - [ ] Destination Q&A recommendations chatbot.
+- [x] **Phase 5: LLM Integration** (Completed)
+  - [x] AI itinerary draft generator (supports appending or replacing existing activities).
+  - [x] Chat message summarization tool (condenses chat log records into concrete decisions reached).
+  - [x] Destination Q&A recommendations chatbot (scoped traveling adviser assistant).
+  - [x] Route order optimization adviser (arranges activity sequence to reduce backtracking).
 - [ ] **Phase 6: WebRTC Video Calling** (Pending)
   - [ ] WebRTC peer connections using Simple-Peer over Socket.io signaling.
   - [ ] Split-view itinerary and planning interface alongside video feeds.
@@ -348,6 +350,29 @@ Phase 4 adds expense splitting capabilities and a transaction-minimization settl
   * **Expenses Workspace**: Display panel lists recent expenses with details on who paid, description, amount, and category.
   * **Interactive Settle-up Panel**: Displays net user balances (positive/green for creditors, negative/red for debtors) alongside a list of direct, optimized payments (e.g. *"Bob owes Alice $50.00"*).
   * **Socket Updates**: Balances and settlement views update instantly in response to real-time events (`expense:added`, `expense:deleted`, `balances:updated`).
+
+### Phase 5 Checkpoint (LLM Integration)
+Phase 5 integrates AI capabilities by communicating server-side with the Gemini API to safeguard developer credentials.
+
+#### 1. Backend REST Endpoints
+All AI operations are nested under the trip router (`/api/trips/:tripId/ai`) and mapped in [`ai.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/routes/ai.js):
+* `POST /generate-itinerary`: Accepts a text prompt and modes (`fill` or `replace`). Calls the Gemini model using a predefined JSON schema structure to build daily activity list arrays. Reordered and created days are pushed via Socket.io `day:added` broadcasts.
+* `POST /summarize-chat`: Scopes the last 200 messages in the trip chat and queries the LLM to output a concise bulleted decision summary (rendered to users in the Chat Panel).
+* `POST /recommendations`: Scopes chatbot queries scope-restricted to destination travel tips.
+* `POST /optimize-route/:dayId`: Takes activity title and location fields for a day and arranges their visiting order geographically to minimize backtracking.
+
+#### 2. Gemini Connection Wrapper
+* Handled in [`llm.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/backend/src/lib/llm.js) using Google's `gemini-3.6-flash` model.
+* Uses native `responseSchema` parameters inside structural generation queries to ensure strict output compliance without markdown backticks parsing issues.
+* Configures `thinkingLevel: "minimal"` to ensure low-latency JSON returns that fit inside standard quota limits.
+
+#### 3. Frontend Workspace UI & API Clients
+* **API Handler**:
+  * [`ai.js`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/api/ai.js): Client request functions mapping all AI queries.
+* **UI Features in [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx)**:
+  * **Draft Generator**: Input text area where planners describe their dream trip, select whether to append or replace, and generate day activities that instantly render onto the timeline.
+  * **Chat Decisions Card**: Decoded decisions from the chat list display inside the Group Chat sidebar.
+  * **Travel Guide Dialog**: Side-panel recommendation dialogue where users can ask custom travel Q&A.
 
 ---
 
