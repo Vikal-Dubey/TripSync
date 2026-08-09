@@ -15,3 +15,7 @@ export function addActivity(token, tripId, dayId, data) {
 export function deleteActivity(token, tripId, dayId, activityId) {
   return request(`/api/trips/${tripId}/days/${dayId}/activities/${activityId}`, { method: "DELETE", token });
 }
+
+export function deleteDay(token, tripId, dayId) {
+  return request(`/api/trips/${tripId}/days/${dayId}`, { method: "DELETE", token });
+}

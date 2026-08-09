@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getTrip } from "../api/trips.js";
-import { listDays, addDay, addActivity, deleteActivity } from "../api/itinerary.js";
+import { listDays, addDay, deleteDay, addActivity, deleteActivity } from "../api/itinerary.js";
 import { listPackingItems, addPackingItem, togglePackingItem } from "../api/packing.js";
 import { listVotes, createVote } from "../api/votes.js";
 import { listMessages } from "../api/chat.js";
@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/authStore.js";
 import { getSocket } from "../lib/socket.js";
 import { listBookings, addBooking, updateBooking, deleteBooking } from "../api/bookings.js";
 import { listExpenses, getBalances, addExpense, deleteExpense } from "../api/expenses.js";
+import { generateItinerary, summarizeChat, askRecommendation, optimizeRoute } from "../api/ai.js";
 
 export default function TripPage() {
   const { tripId } = useParams();
@@ -25,7 +26,15 @@ export default function TripPage() {
   const [error, setError] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balanceSummary, setBalanceSummary] = useState({ balances: [], settlements: [] });
-
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [chatSummary, setChatSummary] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [recQuestion, setRecQuestion] = useState("");
+  const [recAnswer, setRecAnswer] = useState(null);
+  const [askingRec, setAskingRec] = useState(false);
+  const [aiMode, setAiMode] = useState("fill");
+  
   const socketRef = useRef(null);
 
   // Initial load — plain REST, one time
@@ -136,6 +145,11 @@ export default function TripPage() {
   async function handleAddDay() {
     await addDay(token, tripId, { dayNumber: days.length + 1 });
   }
+
+  async function handleDeleteDay(dayId) {
+    await deleteDay(token, tripId, dayId);
+  }
+
   async function handleAddActivity(dayId, title) {
     if (!title.trim()) return;
     await addActivity(token, tripId, dayId, { title });
@@ -182,6 +196,45 @@ export default function TripPage() {
     await deleteExpense(token, tripId, expenseId);
   }
 
+  async function handleGenerateItinerary() {
+    if (!aiPrompt.trim()) return;
+    setGenerating(true);
+    try {
+      await generateItinerary(token, tripId, aiPrompt, aiMode);
+      setAiPrompt("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleSummarizeChat() {
+    setSummarizing(true);
+    try {
+      const { summary } = await summarizeChat(token, tripId);
+      setChatSummary(summary);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  async function handleAskRecommendation() {
+    if (!recQuestion.trim()) return;
+    setAskingRec(true);
+    setRecAnswer(null);
+    try {
+      const { answer } = await askRecommendation(token, tripId, recQuestion);
+      setRecAnswer(answer);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAskingRec(false);
+    }
+  }
+
   if (error) return <p className="text-red-600 text-center mt-10">{error}</p>;
   if (!trip) return <p className="text-center text-ink/50 font-mono text-sm mt-10">Loading…</p>;
 
@@ -218,6 +271,31 @@ export default function TripPage() {
       </Section>
 
       <Section title="Itinerary">
+        <div className="card mb-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              className="input flex-1 text-sm"
+              placeholder='e.g. "budget trip, love trekking"'
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleGenerateItinerary()}
+            />
+            <button className="btn-primary text-sm whitespace-nowrap" onClick={handleGenerateItinerary} disabled={generating}>
+              {generating ? "Generating…" : "✨ Generate with AI"}
+            </button>
+          </div>
+          <div className="flex gap-4 text-xs text-ink/60">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="radio" name="aiMode" checked={aiMode === "fill"} onChange={() => setAiMode("fill")} />
+              Fill in remaining days ({Math.max(0, Math.ceil((new Date(trip.endDate) - new Date(trip.startDate)) / 86400000) + 1 - days.length)} left)
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="radio" name="aiMode" checked={aiMode === "replace"} onChange={() => setAiMode("replace")} />
+              Regenerate entire itinerary
+            </label>
+          </div>
+        </div>
+
         <div className="relative">
           {days.map((day, i) => (
             <div key={day.id} className="relative pl-8 pb-4">
@@ -229,8 +307,11 @@ export default function TripPage() {
               </span>
               <DayBlock
                 day={day}
+                tripId={tripId}
+                token={token}
                 onAddActivity={(title) => handleAddActivity(day.id, title)}
                 onDeleteActivity={(activityId) => handleDeleteActivity(day.id, activityId)}
+                onDeleteDay={() => handleDeleteDay(day.id)}
               />
             </div>
           ))}
@@ -256,9 +337,44 @@ export default function TripPage() {
           onDelete={handleDeleteBooking}
         />
       </Section>
-
+      
       <Section title="Group chat">
+        <button className="text-xs text-trail hover:underline mb-2" onClick={handleSummarizeChat} disabled={summarizing}>
+          {summarizing ? "summarizing…" : "✨ Summarize decisions"}
+        </button>
+        {chatSummary && (
+          <div className="card mb-3">
+            {chatSummary.length === 0 ? (
+              <p className="text-sm text-ink/50">No clear decisions found yet.</p>
+            ) : (
+              <ul className="list-disc list-inside text-sm flex flex-col gap-1">
+                {chatSummary.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <ChatBox messages={messages} currentUserId={currentUserId} onSend={handleSendChat} />
+      </Section>
+
+
+      <Section title="Ask a local">
+        <div className="card">
+          <div className="flex gap-2 mb-3">
+            <input
+              className="input flex-1 text-sm"
+              placeholder="e.g. any good street food nearby?"
+              value={recQuestion}
+              onChange={(e) => setRecQuestion(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAskRecommendation()}
+            />
+            <button className="btn-primary text-sm" onClick={handleAskRecommendation} disabled={askingRec}>
+              {askingRec ? "…" : "Ask"}
+            </button>
+          </div>
+          {recAnswer && <p className="text-sm text-ink/80">{recAnswer}</p>}
+        </div>
       </Section>
 
       <Section title="Expenses">
@@ -285,10 +401,50 @@ function Section({ title, children }) {
   );
 }
 
-function DayBlock({ day, onAddActivity, onDeleteActivity }) {
+function DayBlock({ day, tripId, token, onAddActivity, onDeleteActivity, onDeleteDay }) {
   const [title, setTitle] = useState("");
+  const [suggestedOrder, setSuggestedOrder] = useState(null);
+  const [optimizing, setOptimizing] = useState(false);
+
+  async function handleOptimize() {
+    setOptimizing(true);
+    try {
+      const { suggestedOrder } = await optimizeRoute(token, tripId, day.id);
+      setSuggestedOrder(suggestedOrder);
+    } catch {
+      // non-critical, fail silently
+    } finally {
+      setOptimizing(false);
+    }
+  }
+
   return (
     <div className="card">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-ink/40 font-mono">Day {day.dayNumber}</span>
+        <div className="flex gap-3">
+          {day.activities.length > 1 && (
+            <button className="text-xs text-trail hover:underline" onClick={handleOptimize} disabled={optimizing}>
+              {optimizing ? "thinking…" : "suggest order"}
+            </button>
+          )}
+          <button
+            className="text-xs text-ink/40 hover:text-red-500"
+            onClick={() => {
+              if (confirm(`Delete Day ${day.dayNumber} and all its activities?`)) onDeleteDay();
+            }}
+          >
+            delete day
+          </button>
+        </div>
+      </div>
+
+      {suggestedOrder && (
+        <div className="code-chip bg-amber/10! text-ink! text-xs mb-2 block">
+          Suggested order: {suggestedOrder.join(" → ")}
+        </div>
+      )}
+
       <ul className="flex flex-col gap-1 mb-2">
         {day.activities.map((a) => (
           <li key={a.id} className="flex items-center justify-between text-sm">
