@@ -7,6 +7,7 @@ import { prisma } from "./lib/prisma.js";
 import { verifyToken } from "./lib/jwt.js";
 import authRoutes from "./routes/auth.js";
 import tripRoutes from "./routes/trips.js";
+const activeCalls = new Map(); // tripId -> Map(socketId -> { userId, name })
 
 const app = express();
 const httpServer = createServer(app);
@@ -85,8 +86,58 @@ io.on("connection", (socket) => {
     io.to(tripId).emit("vote:updated", updated);
   });
 
+  // --- WebRTC call signaling ---
+
+  socket.on("call:join", async (tripId, callback) => {
+    const member = await prisma.tripMember.findUnique({
+      where: { tripId_userId: { tripId, userId: socket.userId } },
+      include: { user: { select: { name: true } } },
+    });
+    if (!member) return callback?.({ ok: false, error: "Not a member of this trip" });
+
+    if (!activeCalls.has(tripId)) activeCalls.set(tripId, new Map());
+    const call = activeCalls.get(tripId);
+
+    const existingPeers = [...call.entries()].map(([socketId, info]) => ({ socketId, ...info }));
+
+    call.set(socket.id, { userId: socket.userId, name: member.user.name });
+    socket.data.callTripId = tripId;
+
+    socket.to(tripId).emit("call:peer-joined", {
+      socketId: socket.id,
+      userId: socket.userId,
+      name: member.user.name,
+    });
+
+    callback?.({ ok: true, existingPeers });
+  });
+
+  socket.on("webrtc:signal", ({ to, signal }) => {
+    io.to(to).emit("webrtc:signal", { from: socket.id, signal });
+  });
+
+  socket.on("call:leave", (tripId) => {
+    const call = activeCalls.get(tripId);
+    if (call) {
+      call.delete(socket.id);
+      if (call.size === 0) activeCalls.delete(tripId);
+    }
+    socket.to(tripId).emit("call:peer-left", { socketId: socket.id });
+    socket.data.callTripId = null;
+  });
+
   socket.on("disconnect", () => {
     console.log("socket disconnected:", socket.id);
+    
+    const tripId = socket.data.callTripId;
+    if (tripId) {
+      const call = activeCalls.get(tripId);
+      if (call) {
+        call.delete(socket.id);
+        if (call.size === 0) activeCalls.delete(tripId);
+      }
+      socket.to(tripId).emit("call:peer-left", { socketId: socket.id });
+    }
   });
 });
 
