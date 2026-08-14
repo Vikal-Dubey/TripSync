@@ -10,6 +10,7 @@ import { getSocket } from "../lib/socket.js";
 import { listBookings, addBooking, updateBooking, deleteBooking } from "../api/bookings.js";
 import { listExpenses, getBalances, addExpense, deleteExpense } from "../api/expenses.js";
 import { generateItinerary, summarizeChat, askRecommendation, optimizeRoute } from "../api/ai.js";
+import VideoCall from "../components/VideoCall.jsx";
 
 export default function TripPage() {
   const { tripId } = useParams();
@@ -268,6 +269,16 @@ export default function TripPage() {
             </li>
           ))}
         </ul>
+      </Section>
+      
+      <Section title="Planning call">
+        {socketRef.current && (
+          <VideoCall
+            socket={socketRef.current}
+            tripId={tripId}
+            currentUserName={trip.members.find((m) => m.userId === currentUserId)?.user.name}
+          />
+        )}
       </Section>
 
       <Section title="Itinerary">
