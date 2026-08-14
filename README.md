@@ -47,7 +47,7 @@ TripSync/
     │   │   ├── packing.js    # Packing checklist API client
     │   │   ├── trips.js      # Trips settings & info API client
     │   │   └── votes.js      # Voting/Polls API client
-    │   ├── components/       # Shared interface components (Navbar, ProtectedRoute)
+    │   ├── components/       # Shared UI components (Navbar, ProtectedRoute, VideoCall)
     │   ├── lib/              # Frontend utilities and connections
     │   │   └── socket.js     # Socket.io client instance initialization
     │   ├── pages/            # View components (Dashboard, Login, Signup, Trip, JoinTrip)
@@ -56,7 +56,7 @@ TripSync/
     │   └── main.jsx          # DOM rendering and entry configuration
     ├── .env.example          # Template client-side environment configurations
     └── package.json          # Client dependencies & scripts configuration
-```
+```,StartLine:40,TargetContent:
 
 ---
 
@@ -231,12 +231,13 @@ erDiagram
   - [x] Chat message summarization tool (condenses chat log records into concrete decisions reached).
   - [x] Destination Q&A recommendations chatbot (scoped traveling adviser assistant).
   - [x] Route order optimization adviser (arranges activity sequence to reduce backtracking).
-- [ ] **Phase 6: WebRTC Video Calling** (Pending)
-  - [ ] WebRTC peer connections using Simple-Peer over Socket.io signaling.
-  - [ ] Split-view itinerary and planning interface alongside video feeds.
+- [x] **Phase 6: WebRTC Video Calling** (Completed)
+  - [x] WebRTC peer connections using Simple-Peer over Socket.io signaling.
+  - [x] Multi-user mesh peer call lifecycle management (calls join/signal relay/leave).
+  - [x] Split-view UI showing client webcam, peer tiles, audio/video toggles, and itinerary/budget interfaces side-by-side.
 - [ ] **Phase 7: Stretch Features** (Pending)
   - [ ] Currency conversion utilities.
-  - [ ] Weather forecast warnings for itinerary days.
+  - [ ] Weather forecast warnings on itinerary days.
 - [ ] **Phase 8: Polish & Deployment** (Pending)
   - [ ] Production deployment.
   - [ ] Seed data scripts for interviews/demos.
@@ -373,6 +374,24 @@ All AI operations are nested under the trip router (`/api/trips/:tripId/ai`) and
   * **Draft Generator**: Input text area where planners describe their dream trip, select whether to append or replace, and generate day activities that instantly render onto the timeline.
   * **Chat Decisions Card**: Decoded decisions from the chat list display inside the Group Chat sidebar.
   * **Travel Guide Dialog**: Side-panel recommendation dialogue where users can ask custom travel Q&A.
+
+### Phase 6 Checkpoint (WebRTC Video Calling)
+Phase 6 adds real-time video conferencing to the trip dashboard workspace, allowing group trip planners to conduct voice/video calls inside the app.
+
+#### 1. Signaling Server Events
+* **Call Membership Check**: When joining a call (`call:join`), the backend verifies the user is a member of the trip room and checks active calls in a server-side map. Returns `existingPeers` in the call.
+* **Signaling Relay**: Peer targets use the `webrtc:signal` socket event to relay WebRTC SDP offers/answers and ICE candidate payloads directly to each other via target socket routing (`io.to(to).emit`).
+* **Connection Lifecycle**: Broadcasts `call:peer-joined` when a client connects, and `call:peer-left` when a client triggers `call:leave` or disconnects from the socket.
+
+#### 2. Decentralized Peer-to-Peer Mesh
+* Built client-side using `simple-peer` to connect users in a full mesh network.
+* Allows participants to stream high-quality audio and video directly to one another without using an external media server, which is cost-effective and low-latency for groups of up to 6 people.
+
+#### 3. Frontend UI Panel & Controls
+* Handled by the [`VideoCall.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/components/VideoCall.jsx) component, integrated within [`TripPage.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/pages/TripPage.jsx):
+  * **Planning Call Toggle**: User triggers "📹 Join planning call" to open the local camera feed and begin connecting to other call members.
+  * **Video Call Grid Layout**: Local and peer feeds display in a grid with custom label overlays showing participant names.
+  * **Conferencing Actions**: Bottom control buttons let users mute/unmute audio tracks, turn camera feeds on/off, or hang up and leave the call.
 
 ---
 
