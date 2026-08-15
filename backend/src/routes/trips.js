@@ -42,6 +42,13 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   const trips = await prisma.trip.findMany({
     where: { members: { some: { userId: req.userId } } },
+    include: {
+      members: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
   res.json(trips);
@@ -76,8 +83,39 @@ router.patch("/:tripId", requireOrganizer, async (req, res) => {
 
 // Delete trip (organizer only)
 router.delete("/:tripId", requireOrganizer, async (req, res) => {
-  await prisma.trip.delete({ where: { id: req.params.tripId } });
-  res.status(204).send();
+  const tripId = req.params.tripId;
+
+  try {
+    // Delete ExpenseSplit first (need to find expenses of the trip first)
+    const expenses = await prisma.expense.findMany({ where: { tripId } });
+    const expenseIds = expenses.map((e) => e.id);
+    if (expenseIds.length > 0) {
+      await prisma.expenseSplit.deleteMany({ where: { expenseId: { in: expenseIds } } });
+    }
+    await prisma.expense.deleteMany({ where: { tripId } });
+
+    // Delete Activity (need to find itinerary days first)
+    const days = await prisma.itineraryDay.findMany({ where: { tripId } });
+    const dayIds = days.map((d) => d.id);
+    if (dayIds.length > 0) {
+      await prisma.activity.deleteMany({ where: { dayId: { in: dayIds } } });
+    }
+    await prisma.itineraryDay.deleteMany({ where: { tripId } });
+
+    // Delete other direct relations
+    await prisma.booking.deleteMany({ where: { tripId } });
+    await prisma.vote.deleteMany({ where: { tripId } });
+    await prisma.chatMessage.deleteMany({ where: { tripId } });
+    await prisma.packingItem.deleteMany({ where: { tripId } });
+    await prisma.tripMember.deleteMany({ where: { tripId } });
+
+    // Delete the trip itself
+    await prisma.trip.delete({ where: { id: tripId } });
+
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete trip: " + err.message });
+  }
 });
 
 // Join a trip via invite link

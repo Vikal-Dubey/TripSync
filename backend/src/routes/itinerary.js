@@ -13,16 +13,55 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { dayNumber, date } = req.body;
-  if (!dayNumber) return res.status(400).json({ error: "dayNumber is required" });
+  const trip = await prisma.trip.findUnique({
+    where: { id: req.params.tripId },
+  });
+  if (!trip) return res.status(404).json({ error: "Trip not found" });
+
+  const totalTripDays = Math.ceil((new Date(trip.endDate) - new Date(trip.startDate)) / 86400000) + 1;
+
+  const existingDays = await prisma.itineraryDay.findMany({
+    where: { tripId: req.params.tripId },
+    orderBy: { dayNumber: "asc" },
+  });
+
+  if (existingDays.length >= totalTripDays) {
+    return res.status(400).json({ error: `Cannot add more days. This trip duration is limited to ${totalTripDays} days.` });
+  }
+
+  const nextDayNumber = existingDays.length + 1;
+  const targetDate = new Date(trip.startDate);
+  targetDate.setDate(targetDate.getDate() + existingDays.length);
 
   const day = await prisma.itineraryDay.create({
-    data: { tripId: req.params.tripId, dayNumber, date: date ? new Date(date) : null },
+    data: { 
+      tripId: req.params.tripId, 
+      dayNumber: nextDayNumber, 
+      date: targetDate 
+    },
     include: { activities: true },
   });
 
   req.app.get("io").to(req.params.tripId).emit("day:added", day);
   res.status(201).json(day);
+});
+
+router.patch("/:dayId", async (req, res) => {
+  const { name } = req.body;
+  
+  const day = await prisma.itineraryDay.findFirst({
+    where: { id: req.params.dayId, tripId: req.params.tripId },
+  });
+  if (!day) return res.status(404).json({ error: "Day not found in this trip" });
+
+  const updatedDay = await prisma.itineraryDay.update({
+    where: { id: req.params.dayId },
+    data: { name: name !== undefined ? name : null },
+    include: { activities: true },
+  });
+
+  req.app.get("io").to(req.params.tripId).emit("day:updated", updatedDay);
+  res.json(updatedDay);
 });
 
 router.delete("/:dayId", async (req, res) => {
@@ -31,10 +70,37 @@ router.delete("/:dayId", async (req, res) => {
   });
   if (!day) return res.status(404).json({ error: "Day not found in this trip" });
 
+  const deletedDayNumber = day.dayNumber;
+
   await prisma.activity.deleteMany({ where: { dayId: day.id } });
   await prisma.itineraryDay.delete({ where: { id: day.id } });
 
-  req.app.get("io").to(req.params.tripId).emit("day:deleted", { dayId: day.id });
+  // Shift all days with a dayNumber greater than the deleted day down by 1
+  const daysToShift = await prisma.itineraryDay.findMany({
+    where: {
+      tripId: req.params.tripId,
+      dayNumber: { gt: deletedDayNumber },
+    },
+  });
+
+  for (const d of daysToShift) {
+    await prisma.itineraryDay.update({
+      where: { id: d.id },
+      data: { dayNumber: d.dayNumber - 1 },
+    });
+  }
+
+  // Fetch updated contiguous days list to broadcast to all clients
+  const updatedDays = await prisma.itineraryDay.findMany({
+    where: { tripId: req.params.tripId },
+    include: { activities: true },
+    orderBy: { dayNumber: "asc" },
+  });
+
+  const io = req.app.get("io");
+  io.to(req.params.tripId).emit("day:deleted", { dayId: day.id });
+  io.to(req.params.tripId).emit("itinerary:sync", updatedDays);
+
   res.status(204).send();
 });
 

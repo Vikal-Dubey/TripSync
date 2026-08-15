@@ -63,6 +63,7 @@ model ItineraryDay {
   tripId    String
   dayNumber Int
   date      DateTime?
+  name      String?
 
   trip       Trip       @relation(fields: [tripId], references: [id])
   activities Activity[]
