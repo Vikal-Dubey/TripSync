@@ -11,6 +11,8 @@ import { listBookings, addBooking, updateBooking, deleteBooking } from "../api/b
 import { listExpenses, getBalances, addExpense, deleteExpense } from "../api/expenses.js";
 import { generateItinerary, summarizeChat, askRecommendation, optimizeRoute } from "../api/ai.js";
 import VideoCall from "../components/VideoCall.jsx";
+import { getWeather } from "../api/weather.js";
+import CurrencyConverter from "../components/CurrencyConverter.jsx";
 
 export default function TripPage() {
   const { tripId } = useParams();
@@ -35,22 +37,35 @@ export default function TripPage() {
   const [recAnswer, setRecAnswer] = useState(null);
   const [askingRec, setAskingRec] = useState(false);
   const [aiMode, setAiMode] = useState("fill");
-  
+  const [weather, setWeather] = useState({ available: false });
+
   const socketRef = useRef(null);
 
   // Initial load — plain REST, one time
   useEffect(() => {
-    Promise.all([
-      getTrip(token, tripId),
-      listDays(token, tripId),
-      listPackingItems(token, tripId),
-      listBookings(token, tripId),
-      listVotes(token, tripId),
-      listMessages(token, tripId),
-      listExpenses(token, tripId),
-      getBalances(token, tripId),
-    ])
-      .then(([tripData, daysData, itemsData, bookingsData, votesData, messagesData, expensesData, balancesData]) => {
+  Promise.all([
+    getTrip(token, tripId),
+    listDays(token, tripId),
+    listPackingItems(token, tripId),
+    listBookings(token, tripId),
+    listVotes(token, tripId),
+    listMessages(token, tripId),
+    listExpenses(token, tripId),
+    getBalances(token, tripId),
+    getWeather(token, tripId),
+  ])
+    .then(
+      ([
+        tripData,
+        daysData,
+        itemsData,
+        bookingsData,
+        votesData,
+        messagesData,
+        expensesData,
+        balancesData,
+        weatherData,
+      ]) => {
         setTrip(tripData);
         setDays(daysData);
         setPackingItems(itemsData);
@@ -59,9 +74,11 @@ export default function TripPage() {
         setMessages(messagesData);
         setExpenses(expensesData);
         setBalanceSummary(balancesData);
-      })
-      .catch((e) => setError(e.message));
-  }, [token, tripId]);
+        setWeather(weatherData);
+      }
+    )
+    .catch((e) => setError(e.message));
+}, [token, tripId]);
 
   // Socket connection + event wiring
   useEffect(() => {
@@ -320,6 +337,7 @@ export default function TripPage() {
                 day={day}
                 tripId={tripId}
                 token={token}
+                weatherForDay={weather.available ? weather.forecast.find((f) => f.dayNumber === day.dayNumber) : null}
                 onAddActivity={(title) => handleAddActivity(day.id, title)}
                 onDeleteActivity={(activityId) => handleDeleteActivity(day.id, activityId)}
                 onDeleteDay={() => handleDeleteDay(day.id)}
@@ -349,6 +367,10 @@ export default function TripPage() {
         />
       </Section>
       
+      <Section title="Currency converter">
+        <CurrencyConverter />
+      </Section>
+
       <Section title="Group chat">
         <button className="text-xs text-trail hover:underline mb-2" onClick={handleSummarizeChat} disabled={summarizing}>
           {summarizing ? "summarizing…" : "✨ Summarize decisions"}
@@ -412,13 +434,22 @@ function Section({ title, children }) {
   );
 }
 
-function DayBlock({ day, tripId, token, onAddActivity, onDeleteActivity, onDeleteDay }) {
+function DayBlock({
+  day,
+  tripId,
+  token,
+  weatherForDay,
+  onAddActivity,
+  onDeleteActivity,
+  onDeleteDay,
+}) {
   const [title, setTitle] = useState("");
   const [suggestedOrder, setSuggestedOrder] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
 
   async function handleOptimize() {
     setOptimizing(true);
+
     try {
       const { suggestedOrder } = await optimizeRoute(token, tripId, day.id);
       setSuggestedOrder(suggestedOrder);
@@ -432,17 +463,48 @@ function DayBlock({ day, tripId, token, onAddActivity, onDeleteActivity, onDelet
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-ink/40 font-mono">Day {day.dayNumber}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-ink/40 font-mono">
+            Day {day.dayNumber}
+          </span>
+
+          {weatherForDay && (
+            <span
+              className={`code-chip py-0.5! text-xs ${
+                weatherForDay.precipitationProbability >= 50
+                  ? "bg-amber/20! text-amber"
+                  : ""
+              }`}
+            >
+              {weatherForDay.precipitationProbability >= 50 ? "🌧️" : "☀️"}{" "}
+              {weatherForDay.precipitationProbability}% ·{" "}
+              {Math.round(weatherForDay.tempMax)}°/
+              {Math.round(weatherForDay.tempMin)}°
+            </span>
+          )}
+        </div>
+
         <div className="flex gap-3">
           {day.activities.length > 1 && (
-            <button className="text-xs text-trail hover:underline" onClick={handleOptimize} disabled={optimizing}>
+            <button
+              className="text-xs text-trail hover:underline"
+              onClick={handleOptimize}
+              disabled={optimizing}
+            >
               {optimizing ? "thinking…" : "suggest order"}
             </button>
           )}
+
           <button
             className="text-xs text-ink/40 hover:text-red-500"
             onClick={() => {
-              if (confirm(`Delete Day ${day.dayNumber} and all its activities?`)) onDeleteDay();
+              if (
+                confirm(
+                  `Delete Day ${day.dayNumber} and all its activities?`
+                )
+              ) {
+                onDeleteDay();
+              }
             }}
           >
             delete day
@@ -458,16 +520,29 @@ function DayBlock({ day, tripId, token, onAddActivity, onDeleteActivity, onDelet
 
       <ul className="flex flex-col gap-1 mb-2">
         {day.activities.map((a) => (
-          <li key={a.id} className="flex items-center justify-between text-sm">
+          <li
+            key={a.id}
+            className="flex items-center justify-between text-sm"
+          >
             <span>
-              {a.title} {a.time && <span className="text-ink/40 font-mono text-xs ml-1">{a.time}</span>}
+              {a.title}{" "}
+              {a.time && (
+                <span className="text-ink/40 font-mono text-xs ml-1">
+                  {a.time}
+                </span>
+              )}
             </span>
-            <button className="text-ink/30 hover:text-red-500 text-xs" onClick={() => onDeleteActivity(a.id)}>
+
+            <button
+              className="text-ink/30 hover:text-red-500 text-xs"
+              onClick={() => onDeleteActivity(a.id)}
+            >
               remove
             </button>
           </li>
         ))}
       </ul>
+
       <input
         className="input w-full text-sm"
         placeholder="Add activity, press Enter"
