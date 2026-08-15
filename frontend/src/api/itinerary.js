@@ -19,3 +19,7 @@ export function deleteActivity(token, tripId, dayId, activityId) {
 export function deleteDay(token, tripId, dayId) {
   return request(`/api/trips/${tripId}/days/${dayId}`, { method: "DELETE", token });
 }
+
+export function updateDay(token, tripId, dayId, data) {
+  return request(`/api/trips/${tripId}/days/${dayId}`, { method: "PATCH", body: data, token });
+}

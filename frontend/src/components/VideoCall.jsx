@@ -43,7 +43,6 @@ export default function VideoCall({ socket, tripId, currentUserName }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
-      
 
       socket.emit("call:join", tripId, ({ ok, error, existingPeers }) => {
         if (!ok) return setError(error ?? "Failed to join call");
@@ -63,6 +62,7 @@ export default function VideoCall({ socket, tripId, currentUserName }) {
     setRemotePeers({});
   }
 
+  // eslint-disable-next-line no-unused-vars
   function toggleMic() {
     const track = localStreamRef.current?.getAudioTracks()?.[0];
     if (track) {
@@ -71,6 +71,7 @@ export default function VideoCall({ socket, tripId, currentUserName }) {
     }
   }
 
+  // eslint-disable-next-line no-unused-vars
   function toggleCam() {
     const track = localStreamRef.current?.getVideoTracks()?.[0];
     if (track) {
@@ -98,7 +99,6 @@ export default function VideoCall({ socket, tripId, currentUserName }) {
       socket.off("call:peer-joined", handlePeerJoined);
       socket.off("webrtc:signal", handleSignal);
       socket.off("call:peer-left", handlePeerLeft);
-      // Leave the call if the whole page unmounts while still connected
       if (localStreamRef.current) leaveCall();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,56 +106,100 @@ export default function VideoCall({ socket, tripId, currentUserName }) {
 
   useEffect(() => {
     if (inCall && localVideoRef.current && localStreamRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.srcObject = localStreamRef.current;
     }
-    }, [inCall]);
+  }, [inCall]);
 
-    return (
-        <div className="card">
-        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-
-        {!inCall ? (
-            <button className="btn-primary text-sm" onClick={joinCall}>
-            📹 Join planning call
-            </button>
-        ) : (
-            <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                <VideoTile ref={localVideoRef} label={`${currentUserName} (you)`} muted />
-                {Object.entries(remotePeers).map(([socketId, { stream, name }]) => (
-                <RemoteTile key={socketId} stream={stream} label={name} />
-                ))}
-            </div>
-            <div className="flex gap-2">
-                <button className="btn-secondary text-sm" onClick={toggleMic}>
-                {micOn ? "🎤 Mute" : "🔇 Unmute"}
-                </button>
-                <button className="btn-secondary text-sm" onClick={toggleCam}>
-                {camOn ? "📷 Camera off" : "📷 Camera on"}
-                </button>
-                <button className="btn-secondary text-sm ml-auto text-red-600" onClick={leaveCall}>
-                Leave call
-                </button>
-            </div>
-            </>
-        )}
+  return (
+    <div className="card-static bg-surface border border-border-custom p-6 rounded-3xl">
+      {error && (
+        <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-semibold mb-4">
+          {error}
         </div>
-    );
+      )}
+
+      {!inCall ? (
+        <div className="flex flex-col items-center py-6 text-center">
+          <div className="w-14 h-14 bg-teal-primary/10 rounded-full flex items-center justify-center mb-4 text-teal-primary text-xl">
+            📞
+          </div>
+          <h4 className="heading text-base font-semibold text-ink">Planning call is ready</h4>
+          <p className="text-xs text-slate-sec mt-1 mb-5 max-w-xs">
+            Start a voice and video workspace planning session with other online planners of this trip.
+          </p>
+          <button className="btn-primary text-sm py-2.5! px-6!" onClick={joinCall}>
+            Join Planning Session
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <VideoTile ref={localVideoRef} label={`${currentUserName} (you)`} muted micOn={micOn} camOn={camOn} />
+            {Object.entries(remotePeers).map(([socketId, { stream, name }]) => (
+              <RemoteTile key={socketId} stream={stream} label={name} />
+            ))}
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2 border-t border-border-custom pt-4">
+            <button
+              className={`btn-secondary text-xs py-2! px-3.5! font-semibold ${!micOn ? "border-coral/40 text-coral bg-red-50/40 hover:bg-red-50" : ""}`}
+              onClick={toggleMic}
+            >
+              {micOn ? (
+                <>🎤 Mute Mic</>
+              ) : (
+                <>🔇 Unmute Mic</>
+              )}
+            </button>
+            <button
+              className={`btn-secondary text-xs py-2! px-3.5! font-semibold ${!camOn ? "border-coral/40 text-coral bg-red-50/40 hover:bg-red-50" : ""}`}
+              onClick={toggleCam}
+            >
+              {camOn ? (
+                <>📷 Disable Cam</>
+              ) : (
+                <>🎥 Enable Cam</>
+              )}
+            </button>
+            <button
+              className="btn-primary ml-auto text-xs py-2! px-4! bg-red-500 hover:bg-red-600"
+              onClick={leaveCall}
+            >
+              Leave Session
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
-const VideoTile = forwardRef(function VideoTile({ label, muted }, ref) {
+const VideoTile = forwardRef(function VideoTile({ label, muted, micOn, camOn }, ref) {
   return (
-    <div className="relative aspect-video bg-ink rounded-md overflow-hidden">
+    <div className="relative aspect-video bg-ink rounded-2xl overflow-hidden border border-border-custom shadow-inner flex items-center justify-center group">
+      {!camOn && (
+        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-white text-3xl font-extrabold select-none">
+          {label.slice(0, 1).toUpperCase()}
+        </div>
+      )}
+      
       <video
         ref={ref}
         autoPlay
         playsInline
         muted={muted}
-        className="w-full h-full object-cover"
+        style={{ transform: "scaleX(-1)" }}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${camOn ? "opacity-100" : "opacity-0 pointer-events-none"}`}
       />
-      <span className="absolute bottom-1 left-1 code-chip bg-black/50! text-white! text-xs">
-        {label}
-      </span>
+      
+      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+        <span className="text-[10px] font-bold bg-ink/70 text-white py-1 px-2.5 rounded-lg backdrop-blur">
+          {label}
+        </span>
+        <span className="text-xs bg-ink/70 p-1 rounded-lg backdrop-blur">
+          {micOn ? "🎤" : "🔇"}
+        </span>
+      </div>
     </div>
   );
 });
@@ -167,9 +211,11 @@ function RemoteTile({ stream, label }) {
   }, [stream]);
 
   return (
-    <div className="relative aspect-video bg-ink rounded-md overflow-hidden">
-      <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-      <span className="absolute bottom-1 left-1 code-chip bg-black/50! text-white! text-xs">{label}</span>
+    <div className="relative aspect-video bg-ink rounded-2xl overflow-hidden border border-border-custom shadow-inner flex items-center justify-center group">
+      <video ref={videoRef} autoPlay playsInline style={{ transform: "scaleX(-1)" }} className="w-full h-full object-cover" />
+      <span className="absolute bottom-2.5 left-2.5 text-[10px] font-bold bg-ink/70 text-white py-1 px-2.5 rounded-lg backdrop-blur">
+        {label}
+      </span>
     </div>
   );
 }

@@ -1,43 +1,214 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b2545;
-  --color-trail: #1b9aaa;
-  --color-trail-dark: #157e8c;
-  --color-amber: #ff6b5b;
-  --color-sun: #ffc857;
-  --color-paper: #f7f9fa;
-  --color-mist: #e2e8ed;
-  --color-moss: #4c7a5e;
+  --color-ink: #0f172a;
+  --color-slate-sec: #64748b;
+  --color-teal-primary: #0d9488;
+  --color-teal-dark: #0f766e;
+  --color-ocean: #0284c7;
+  --color-sky: #38bdf8;
+  --color-orange-ai: #f97316;
+  --color-coral: #ff6b5b;
+  --color-green-success: #10b981;
+  
+  --color-bg-warm: #fafaf9;
+  --color-bg-mint: #f4fcfc;
+  --color-surface: #ffffff;
+  --color-border-custom: #e2e8f0;
+  --color-muted-custom: #f1f5f9;
 
-  --font-display: "Barlow Condensed", sans-serif;
-  --font-body: "Work Sans", sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 }
 
 body {
-  background: var(--color-paper);
+  background: var(--color-bg-warm);
   color: var(--color-ink);
   font-family: var(--font-body);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply px-4 py-2 rounded-md font-medium transition-colors bg-trail text-white hover:bg-trail-dark;
+    @apply px-5 py-2.5 rounded-xl font-semibold transition-all duration-200 bg-teal-primary text-white hover:bg-teal-dark shadow-sm hover:shadow active:scale-95 cursor-pointer flex items-center justify-center gap-1.5;
   }
   .btn-secondary {
-    @apply px-4 py-2 rounded-md font-medium transition-colors bg-white text-ink border border-mist hover:bg-mist/50;
+    @apply px-5 py-2.5 rounded-xl font-semibold transition-all duration-200 bg-surface text-ink border border-border-custom hover:bg-muted-custom/60 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5;
   }
+  .btn-icon {
+    @apply p-2.5 rounded-xl transition-all duration-150 bg-muted-custom hover:bg-border-custom text-slate-sec hover:text-ink active:scale-95 cursor-pointer flex items-center justify-center;
+  }
+  .btn-danger {
+    @apply px-3 py-1.5 rounded-xl font-medium transition-all duration-200 bg-red-50 text-red-600 hover:bg-red-100 active:scale-95 cursor-pointer text-xs;
+  }
+  
+  /* Form Elements */
   .input {
-    @apply px-3 py-2 rounded-md border border-mist bg-white text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-trail;
+    @apply px-4 py-2.5 rounded-xl border border-border-custom bg-surface text-ink placeholder:text-slate-sec/40 focus:outline-none focus:ring-2 focus:ring-teal-primary/30 focus:border-teal-primary transition-all;
   }
+  .select {
+    @apply px-4 py-2.5 rounded-xl border border-border-custom bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-teal-primary/30 focus:border-teal-primary transition-all;
+  }
+  
+  /* Cards & Layout Panels */
   .card {
-    @apply bg-white border border-mist rounded-lg p-4 shadow-sm;
+    @apply bg-surface border border-border-custom rounded-2xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200;
+  }
+  .card-static {
+    @apply bg-surface border border-border-custom rounded-2xl p-5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)];
+  }
+  .hero-panel {
+    @apply bg-gradient-to-br from-teal-primary/5 via-ocean/5 to-orange-ai/5 border border-border-custom rounded-3xl p-6 md:p-8 shadow-[0_4px_16px_rgba(0,0,0,0.02)] relative overflow-hidden;
+  }
+  
+  /* Typography & Headers */
+  .heading-hero {
+    @apply font-display font-bold tracking-tight text-ink;
   }
   .heading {
-    @apply font-display uppercase tracking-wide text-ink;
+    @apply font-display font-semibold tracking-wide text-ink;
   }
+  
+  /* Custom Badges & Chips */
   .code-chip {
-    @apply font-mono text-sm bg-mist/60 text-ink px-2 py-1 rounded;
+    @apply font-mono text-xs bg-muted-custom text-ink px-2.5 py-1 rounded-lg border border-border-custom;
   }
+  .badge-upcoming {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ocean/10 text-ocean;
+  }
+  .badge-active {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-primary/10 text-teal-primary;
+  }
+  .badge-completed {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-success/10 text-green-success;
+  }
+  .badge-role {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-muted-custom border border-border-custom text-slate-sec;
+  }
+  .badge-organizer {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-coral/10 border border-coral/20 text-coral;
+  }
+
+  /* Progress Bar */
+  .progress-bg {
+    @apply w-full h-2 bg-muted-custom rounded-full overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full bg-teal-primary rounded-full transition-all duration-300;
+  }
+  
+  /* Tab Buttons */
+  .tab-btn {
+    @apply flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 whitespace-nowrap cursor-pointer;
+  }
+  .tab-btn-active {
+    @apply bg-teal-primary/10 text-teal-primary font-semibold;
+  }
+  .tab-btn-inactive {
+    @apply text-slate-sec hover:text-ink hover:bg-muted-custom/60;
+  }
+
+  /* Live Pulse Indicator */
+  .pulse-live {
+    @apply relative inline-block w-2.5 h-2.5 rounded-full bg-teal-primary;
+  }
+  .pulse-live::after {
+    content: '';
+    @apply absolute top-0 left-0 w-full h-full rounded-full bg-teal-primary animate-ping opacity-75;
+  }
+}
+
+/* Custom CSS Keyframes for Landing Page Showcase Animations */
+@keyframes planeTravel {
+  0% { transform: translate(-20px, 40px) rotate(15deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(320px, -30px) rotate(-10deg); opacity: 0; }
+}
+
+@keyframes cloudFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes itemReveal {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes balanceScale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+@keyframes chatBubblePop {
+  0% { opacity: 0; transform: scale(0.9) translateY(12px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes checkStretch {
+  0% { width: 0%; }
+  100% { width: 45%; }
+}
+
+@keyframes checkStretchSub {
+  0% { width: 0%; }
+  100% { width: 30%; }
+}
+
+.anim-plane {
+  animation: planeTravel 12s linear infinite;
+}
+
+.anim-cloud-1 {
+  animation: cloudFloat 5s ease-in-out infinite;
+}
+
+.anim-cloud-2 {
+  animation: cloudFloat 7s ease-in-out infinite;
+}
+
+.anim-item-1 {
+  animation: itemReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.anim-item-2 {
+  animation: itemReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+  opacity: 0;
+}
+
+.anim-item-3 {
+  animation: itemReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+  opacity: 0;
+}
+
+.anim-chat-1 {
+  animation: chatBubblePop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+  opacity: 0;
+}
+
+.anim-chat-2 {
+  animation: chatBubblePop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.5s forwards;
+  opacity: 0;
+}
+
+.anim-chat-3 {
+  animation: chatBubblePop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 3s forwards;
+  opacity: 0;
+}
+
+.anim-balance-scale {
+  animation: balanceScale 3s ease-in-out infinite;
+}
+
+.anim-bar-fill {
+  animation: checkStretch 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.anim-bar-fill-sub {
+  animation: checkStretchSub 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
