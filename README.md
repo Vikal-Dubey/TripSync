@@ -27,36 +27,37 @@ TripSync/
 │   │   └── schema.prisma     # Relational database models definition
 │   ├── src/                  # Backend Application Source Code
 │   │   ├── generated/        # Auto-generated Prisma Client
-│   │   ├── lib/              # Helpers, algorithms & LLM wrapper (jwt.js, llm.js, prisma.js, settleUp.js)
+│   │   ├── lib/              # Helpers, weather & algorithms (jwt.js, llm.js, prisma.js, settleUp.js, weather.js)
 │   │   ├── middleware/       # Express middlewares (auth, member, organizer checks)
-│   │   ├── routes/           # REST endpoints (ai, auth, bookings, chat, expenses, itinerary, packing, trips, votes)
+│   │   ├── routes/           # REST endpoints (ai, auth, bookings, chat, expenses, itinerary, packing, trips, votes, weather)
 │   │   └── index.js          # App entry point, socket handlers & Redis pub/sub config
 │   ├── .env.example          # Template environment configurations
 │   ├── docker-compose.yml    # Docker configuration for Postgres & Redis
 │   └── package.json          # Server package and dev dependencies
 └── frontend/                 # Vite + React Single Page App Frontend
     ├── src/                  # Frontend Application Source Code
-    │   ├── api/              # Axios/Fetch HTTP client API handlers
-    │   │   ├── ai.js         # AI recommendations & optimization API client
-    │   │   ├── auth.js       # Authentication requests
-    │   │   ├── bookings.js   # Bookings CRUD API client
-    │   │   ├── chat.js       # Chat messages API client
-    │   │   ├── client.js     # Shared client settings (headers, base URLs)
-    │   │   ├── expenses.js   # Expense ledger and balances API client
-    │   │   ├── itinerary.js  # Days & Activities API client
-    │   │   ├── packing.js    # Packing checklist API client
-    │   │   ├── trips.js      # Trips settings & info API client
-    │   │   └── votes.js      # Voting/Polls API client
-    │   ├── components/       # Shared UI components (Navbar, ProtectedRoute, VideoCall)
-    │   ├── lib/              # Frontend utilities and connections
-    │   │   └── socket.js     # Socket.io client instance initialization
-    │   ├── pages/            # View components (Dashboard, Login, Signup, Trip, JoinTrip)
-    │   ├── store/            # Lightweight global state stores (Zustand)
-    │   ├── App.jsx           # App shell and routing structure
-    │   └── main.jsx          # DOM rendering and entry configuration
+    ├── api/              # Axios/Fetch HTTP client API handlers
+    │   ├── ai.js         # AI recommendations & optimization API client
+    │   ├── auth.js       # Authentication requests
+    │   ├── bookings.js   # Bookings CRUD API client
+    │   ├── chat.js       # Chat messages API client
+    │   ├── client.js     # Shared client settings (headers, base URLs)
+    │   ├── expenses.js   # Expense ledger and balances API client
+    │   ├── itinerary.js  # Days & Activities API client
+    │   ├── packing.js    # Packing checklist API client
+    │   ├── trips.js      # Trips settings & info API client
+    │   ├── votes.js      # Voting/Polls API client
+    │   └── weather.js    # Weather forecast API client
+    ├── components/       # Shared UI components (Navbar, ProtectedRoute, VideoCall, CurrencyConverter)
+    ├── lib/              # Frontend utilities and connections
+    │   └── socket.js     # Socket.io client instance initialization
+    ├── pages/            # View components (Dashboard, Login, Signup, Trip, JoinTrip)
+    ├── store/            # Lightweight global state stores (Zustand)
+    ├── App.jsx           # App shell and routing structure
+    └── main.jsx          # DOM rendering and entry configuration
     ├── .env.example          # Template client-side environment configurations
     └── package.json          # Client dependencies & scripts configuration
-```,StartLine:40,TargetContent:
+```
 
 ---
 
@@ -235,9 +236,9 @@ erDiagram
   - [x] WebRTC peer connections using Simple-Peer over Socket.io signaling.
   - [x] Multi-user mesh peer call lifecycle management (calls join/signal relay/leave).
   - [x] Split-view UI showing client webcam, peer tiles, audio/video toggles, and itinerary/budget interfaces side-by-side.
-- [ ] **Phase 7: Stretch Features** (Pending)
-  - [ ] Currency conversion utilities.
-  - [ ] Weather forecast warnings on itinerary days.
+- [x] **Phase 7: Stretch Features** (Completed)
+  - [x] Currency conversion utility (uses Frankfurter API for real-time exchange rates).
+  - [x] Weather-aware forecast banners on itinerary days (uses Open-Meteo geocoding and weather API to warn on rain probability and max/min temperatures).
 - [ ] **Phase 8: Polish & Deployment** (Pending)
   - [ ] Production deployment.
   - [ ] Seed data scripts for interviews/demos.
@@ -392,6 +393,18 @@ Phase 6 adds real-time video conferencing to the trip dashboard workspace, allow
   * **Planning Call Toggle**: User triggers "📹 Join planning call" to open the local camera feed and begin connecting to other call members.
   * **Video Call Grid Layout**: Local and peer feeds display in a grid with custom label overlays showing participant names.
   * **Conferencing Actions**: Bottom control buttons let users mute/unmute audio tracks, turn camera feeds on/off, or hang up and leave the call.
+
+### Phase 7 Checkpoint (Stretch Features)
+Phase 7 introduces helper conversion utilities and automated weather conditions integration to help travelers prepare better.
+
+#### 1. Currency Exchange Converter
+* Uses Frankfurter's public API endpoints (`https://api.frankfurter.dev/v2/rate`) to dynamically query currency conversion factors.
+* Instantiated frontend-side inside [`CurrencyConverter.jsx`](file:///c:/Users/sushi/OneDrive/Desktop/My Project/TripSync/frontend/src/components/CurrencyConverter.jsx) to calculate values between INR, USD, EUR, etc. on input changes. Uses `AbortController` to handle input rate-limiting.
+
+#### 2. Weather-Aware Forecasting Banners
+* Backend fetches destination coordinates via Open-Meteo geocoding search APIs.
+* Daily parameters (`precipitation_probability_max`, `temperature_2m_max`, and `temperature_2m_min`) are retrieved for the exact duration of the trip.
+* Maps returned daily items to specific trip `dayNumber` values to display weather state headers directly inside each Itinerary Day timeline card (shows rain warnings "🌧️" for probability values $\ge 50\%$).
 
 ---
 
