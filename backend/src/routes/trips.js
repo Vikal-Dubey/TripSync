@@ -10,6 +10,7 @@ import voteRoutes from "./votes.js";
 import chatRoutes from "./chat.js";
 import expenseRoutes from "./expenses.js";
 import aiRoutes from "./ai.js";
+import weatherRoutes from "./weather.js";
 
 const router = Router();
 router.use(requireAuth); // every route below requires a valid token
@@ -106,5 +107,6 @@ router.use("/:tripId/votes", requireMember, voteRoutes);
 router.use("/:tripId/messages", requireMember, chatRoutes);
 router.use("/:tripId/expenses", requireMember, expenseRoutes);
 router.use("/:tripId/ai", requireMember, aiRoutes);
+router.use("/:tripId/weather", requireMember, weatherRoutes);
 
 export default router;
