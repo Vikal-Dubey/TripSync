@@ -9,17 +9,36 @@ import authRoutes from "./routes/auth.js";
 import tripRoutes from "./routes/trips.js";
 const activeCalls = new Map(); // tripId -> Map(socketId -> { userId, name })
 
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  "http://localhost:5173",
+  "https://trip-sync-amber.vercel.app"
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+};
+
 const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" },
+  cors: corsOptions,
 });
 
 // Any route handler can reach `io` via req.app.get("io") to broadcast after a REST mutation
 app.set("io", io);
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" }));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
